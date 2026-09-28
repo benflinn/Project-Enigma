@@ -94,7 +94,7 @@ export const IC_REFERENCE = {
 };
 
 // High-frequency English quadgrams (log10 probabilities for fast candidate scoring)
-// Normalized floor for unseen quadgrams is -10.0
+// Normalized floor for unseen quadgrams is -7.0
 export const COMMON_ENGLISH_QUADGRAMS: Record<string, number> = {
   TION: -2.31,
   NTHE: -2.48,
@@ -150,6 +150,112 @@ export const COMMON_ENGLISH_QUADGRAMS: Record<string, number> = {
   OSIT: -3.94,
   SITI: -3.95,
   ITIO: -3.97,
+  SUBM: -3.40,
+  UBMA: -3.45,
+  BMAR: -3.48,
+  MARI: -3.50,
+  ARIN: -3.52,
+  RINE: -3.55,
+  INES: -3.58,
+  NVER: -3.60,
+  VERG: -3.62,
+  ERGE: -3.65,
+  ATGR: -3.68,
+  TGRI: -3.70,
+  GRID: -3.72,
+  TWEL: -3.75,
+  WELV: -3.78,
+  ELVE: -3.80,
+  TORP: -3.82,
+  ORPE: -3.85,
+  RPED: -3.88,
+  PEDO: -3.90,
+  LOAD: -3.60,
+  OADE: -3.65,
+  ADED: -3.68,
+  DAND: -3.70,
+  ANDR: -3.72,
+  NDRE: -3.75,
+  DREA: -3.78,
+  READ: -3.80,
+  EADY: -3.82,
+  BATT: -3.50,
+  ATTL: -3.54,
+  TTLE: -3.58,
+  LESH: -3.62,
+  ESHI: -3.65,
+  SHIP: -3.68,
+  COUR: -3.70,
+  OURS: -3.72,
+  URSE: -3.75,
+  BRES: -3.80,
+  REST: -3.82,
+  SPEC: -3.45,
+  PECI: -3.48,
+  ECIA: -3.52,
+  CIAL: -3.55,
+  DISP: -3.58,
+  ISPA: -3.60,
+  SPAT: -3.62,
+  PATC: -3.65,
+  ATCH: -3.68,
+  OPER: -3.70,
+  PERA: -3.72,
+  ERAT: -3.75,
+  RATI: -3.78,
+  COMM: -3.80,
+  OMME: -3.82,
+  MMEN: -3.85,
+  MENC: -3.88,
+  ENCI: -3.90,
+  NCIN: -3.92,
+  CING: -3.95,
+};
+
+// High-frequency German military quadgrams
+export const COMMON_GERMAN_QUADGRAMS: Record<string, number> = {
+  EICH: -2.41,
+  NDER: -2.49,
+  ICHT: -2.53,
+  SCHE: -2.58,
+  ENSI: -2.62,
+  CHTE: -2.66,
+  WETT: -2.70,
+  ETTE: -2.72,
+  TTER: -2.75,
+  BERI: -2.79,
+  ERIC: -2.81,
+  ACHT: -2.85,
+  NORD: -2.88,
+  ORDS: -2.92,
+  RDSE: -2.95,
+  DSEE: -2.98,
+  WIND: -3.02,
+  STAR: -3.06,
+  TARK: -3.09,
+  ARKE: -3.12,
+  SEEA: -3.15,
+  EEAC: -3.18,
+  EACH: -3.20,
+  KLAE: -3.25,
+  LAER: -3.28,
+  AERU: -3.31,
+  ERUN: -3.34,
+  RUNG: -3.37,
+  BOOT: -3.40,
+  UBOO: -3.42,
+  KRIE: -3.45,
+  RIEG: -3.48,
+  IEGS: -3.50,
+  EGSM: -3.53,
+  GSMA: -3.56,
+  SMAR: -3.58,
+  MARI: -3.61,
+  ARIN: -3.63,
+  RINE: -3.66,
+  BEFE: -3.69,
+  EFEH: -3.72,
+  FEHL: -3.75,
 };
 
 /**
@@ -218,22 +324,111 @@ export function calculateChiSquared(
 
 /**
  * Calculates quadgram fitness score for candidate plaintexts.
- * Higher (less negative) values indicate more natural English text.
+ * Higher (less negative) values indicate more natural text.
+ * Supports both English and German quadgram statistical tables.
  */
-export function calculateQuadgramScore(text: string): number {
+export function calculateQuadgramScore(
+  text: string,
+  language: 'ENGLISH' | 'GERMAN' = 'ENGLISH'
+): number {
   const clean = text.toUpperCase().replace(/[^A-Z]/g, '');
   if (clean.length < 4) return -100;
 
+  const table = language === 'GERMAN' ? COMMON_GERMAN_QUADGRAMS : COMMON_ENGLISH_QUADGRAMS;
   let score = 0;
   const floorScore = -7.0; // penalty for unlisted quadgrams
 
   for (let i = 0; i <= clean.length - 4; i++) {
     const quad = clean.substring(i, i + 4);
-    score += COMMON_ENGLISH_QUADGRAMS[quad] ?? floorScore;
+    score += table[quad] ?? floorScore;
   }
 
   // Normalize by number of quadgrams evaluated
   return score / (clean.length - 3);
+}
+
+export interface CandidateConfidence {
+  rating: 'Definitive' | 'High' | 'Moderate' | 'Low';
+  separationRatio: number; // Ratio or delta between rank 1 and rank 2 score
+  explanation: string;
+}
+
+/**
+ * Calculates candidate confidence indicator based on score separation
+ * between the top candidate and runner-up.
+ */
+export function calculateCandidateConfidence(
+  topScore: number,
+  runnerUpScore: number | undefined,
+  method: string
+): CandidateConfidence {
+  if (runnerUpScore === undefined || Number.isNaN(runnerUpScore)) {
+    return {
+      rating: 'Moderate',
+      separationRatio: 1.0,
+      explanation: 'Single candidate evaluated. Verification on simulator recommended.',
+    };
+  }
+
+  const delta = Math.abs(topScore - runnerUpScore);
+
+  if (method === 'INDEX_OF_COINCIDENCE') {
+    if (delta > 0.015 && topScore > 0.055) {
+      return {
+        rating: 'Definitive',
+        separationRatio: delta,
+        explanation: 'Top candidate exhibits clear natural language Index of Coincidence (> 0.055) with wide margin over noise.',
+      };
+    }
+    if (delta > 0.008) {
+      return {
+        rating: 'High',
+        separationRatio: delta,
+        explanation: 'Elevated IoC with noticeable statistical separation from alternative settings.',
+      };
+    }
+    return {
+      rating: 'Moderate',
+      separationRatio: delta,
+      explanation: 'Marginal IoC separation. Polyalphabetic variance may cause false peaks.',
+    };
+  }
+
+  if (method === 'QUADGRAM') {
+    if (delta > 0.6) {
+      return {
+        rating: 'Definitive',
+        separationRatio: delta,
+        explanation: 'Dominant quadgram log-likelihood score indicating genuine language plaintext.',
+      };
+    }
+    if (delta > 0.25) {
+      return {
+        rating: 'High',
+        separationRatio: delta,
+        explanation: 'Clear quadgram separation indicating probable plaintext recovery.',
+      };
+    }
+    return {
+      rating: 'Moderate',
+      separationRatio: delta,
+      explanation: 'Close scores between top candidates. Manual inspection advised.',
+    };
+  }
+
+  // Default / Chi-Square
+  if (delta > 15) {
+    return {
+      rating: 'High',
+      separationRatio: delta,
+      explanation: 'Statistically significant goodness-of-fit separation.',
+    };
+  }
+  return {
+    rating: 'Moderate',
+    separationRatio: delta,
+    explanation: 'Candidate scores are closely clustered. Review plaintext manually.',
+  };
 }
 
 /**

@@ -3,7 +3,8 @@ import {
   SearchBounds,
   SearchProgress,
   ScoringMethod,
-  calculateTotalSearchSpace,
+  SearchStrategy,
+  estimateSearchCost,
 } from '../../engine/cryptanalysis/searchEngine';
 import {
   Play,
@@ -11,14 +12,21 @@ import {
   Cpu,
   Gauge,
   Sparkles,
+  AlertTriangle,
+  Flame,
+  Layers,
+  HelpCircle,
 } from 'lucide-react';
 import { RotorType } from '../../engine/enigma';
+import { generateContextualAssistance } from '../../engine/cryptanalysis/adaptiveIntelligence';
 
 interface AutomatedSearchPanelProps {
   bounds: SearchBounds;
   isSearching: boolean;
   progress: SearchProgress | null;
   controlMode: 'basic' | 'advanced';
+  workerConcurrency: number;
+  onSetWorkerConcurrency: (n: number) => void;
   onUpdateBounds: (partial: Partial<SearchBounds>) => void;
   onStartSearch: () => void;
   onCancelSearch: () => void;
@@ -35,6 +43,8 @@ const ALL_ROTOR_PERMUTATIONS: Array<[RotorType, RotorType, RotorType]> = [
   ['III', 'II', 'I'],
   ['I', 'IV', 'III'],
   ['IV', 'II', 'V'],
+  ['II', 'IV', 'V'],
+  ['I', 'III', 'V'],
 ];
 
 export const AutomatedSearchPanel: React.FC<AutomatedSearchPanelProps> = ({
@@ -42,18 +52,32 @@ export const AutomatedSearchPanel: React.FC<AutomatedSearchPanelProps> = ({
   isSearching,
   progress,
   controlMode,
+  workerConcurrency,
+  onSetWorkerConcurrency,
   onUpdateBounds,
   onStartSearch,
   onCancelSearch,
 }) => {
-  const totalCombinations = useMemo(() => calculateTotalSearchSpace(bounds), [bounds]);
+  const costEstimate = useMemo(() => estimateSearchCost(bounds), [bounds]);
+  const activeStrategy: SearchStrategy = bounds.strategy ?? 'EXHAUSTIVE';
+
+  const contextualAdvice = useMemo(() => {
+    return generateContextualAssistance({
+      selectedCrib: bounds.crib?.text,
+      totalSearchSpace: costEstimate.totalCombinations,
+      activeStrategy,
+      candidateCount: progress?.currentBestCandidate ? 1 : 0,
+      topScore: progress?.currentBestScore,
+      hillClimbingRestarts: bounds.hillClimbing?.maxRestarts,
+    });
+  }, [bounds, costEstimate, activeStrategy, progress]);
 
   // Score History SVG Graph Path
   const svgScorePath = useMemo(() => {
     if (!progress || progress.scoreHistory.length < 2) return '';
     const history = progress.scoreHistory;
-    const width = 300;
-    const height = 60;
+    const width = 320;
+    const height = 65;
 
     const minScore = history[0].bestScore;
     const maxScore = history[history.length - 1].bestScore;
@@ -62,7 +86,7 @@ export const AutomatedSearchPanel: React.FC<AutomatedSearchPanelProps> = ({
     const points = history.map((pt, i) => {
       const x = (i / (history.length - 1)) * width;
       const normalizedY = (pt.bestScore - minScore) / range;
-      const y = height - normalizedY * (height - 12) - 6;
+      const y = height - normalizedY * (height - 14) - 7;
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     });
 
@@ -76,7 +100,7 @@ export const AutomatedSearchPanel: React.FC<AutomatedSearchPanelProps> = ({
     let updated: Array<[RotorType, RotorType, RotorType]>;
     if (exists) {
       updated = bounds.rotorOrders.filter((o) => o.join('-') !== orderKey);
-      if (updated.length === 0) updated = [order]; // keep at least 1
+      if (updated.length === 0) updated = [order];
     } else {
       updated = [...bounds.rotorOrders, order];
     }
@@ -99,7 +123,7 @@ export const AutomatedSearchPanel: React.FC<AutomatedSearchPanelProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Control Panel Configuration Section */}
+      {/* Search Strategy Selection Banner */}
       <div className="bg-stone-900 border border-stone-800 rounded-xl p-5 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-stone-800">
           <div className="flex items-center gap-3">
@@ -108,92 +132,271 @@ export const AutomatedSearchPanel: React.FC<AutomatedSearchPanelProps> = ({
             </div>
             <div>
               <h3 className="font-cinzel text-base font-bold text-stone-100">
-                Bounded Cryptanalytic Search
+                Cryptanalytic Solver Laboratory
               </h3>
               <p className="text-xs text-stone-400 font-mono">
-                {controlMode === 'basic'
-                  ? 'Recommended automated key search based on intelligence briefing'
-                  : 'Customizable keyspace enumeration and fitness scoring'}
+                Strategy: {activeStrategy} · {costEstimate.totalCombinations.toLocaleString()} estimated evaluations
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {!isSearching ? (
+            {isSearching ? (
               <button
-                onClick={onStartSearch}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-mono font-bold text-xs shadow-lg shadow-amber-950/40 transition-all cursor-pointer"
+                onClick={onCancelSearch}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-rose-950/80 hover:bg-rose-900 border border-rose-600 text-rose-300 font-mono text-xs font-bold transition-all shadow cursor-pointer"
               >
-                <Play className="w-4 h-4 fill-current" />
-                <span>Launch Search ({totalCombinations.toLocaleString()} configs)</span>
+                <Square className="w-4 h-4 fill-current" />
+                Cancel Search
               </button>
             ) : (
               <button
-                onClick={onCancelSearch}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-mono font-bold text-xs shadow-lg shadow-red-950/40 transition-all cursor-pointer"
+                onClick={onStartSearch}
+                className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-mono text-xs font-bold transition-all shadow-md shadow-amber-950/40 cursor-pointer"
               >
-                <Square className="w-4 h-4 fill-current" />
-                <span>Cancel Search</span>
+                <Play className="w-4 h-4 fill-current" />
+                Launch Search
               </button>
             )}
           </div>
         </div>
 
-        {/* Basic Mode Summary */}
-        {controlMode === 'basic' && (
-          <div className="bg-stone-950/70 border border-stone-800 rounded-lg p-4 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-mono font-bold text-stone-300">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>Recommended Search Configuration:</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
-              <div className="p-2.5 rounded bg-stone-900 border border-stone-800">
-                <span className="text-[10px] text-stone-500 uppercase block">Rotor Order</span>
-                <span className="text-stone-200 font-bold">
-                  {bounds.rotorOrders.map((o) => o.join('-')).join(', ')}
-                </span>
+        {/* Strategy Tabs */}
+        <div>
+          <label className="text-xs font-mono font-medium text-stone-300 block mb-2">
+            Cryptanalysis Strategy
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <button
+              onClick={() => onUpdateBounds({ strategy: 'EXHAUSTIVE' })}
+              className={`p-3 rounded-lg border text-left transition-colors cursor-pointer ${
+                activeStrategy === 'EXHAUSTIVE'
+                  ? 'bg-amber-950/60 border-amber-500 text-amber-300'
+                  : 'bg-stone-950/60 border-stone-800 text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <div className="flex items-center gap-2 font-mono text-xs font-bold mb-1">
+                <Layers className="w-4 h-4" />
+                Exhaustive Search
               </div>
+              <p className="text-[11px] text-stone-400 font-sans">
+                Bounded permutation sweep across rotor orders and wheel starting positions.
+              </p>
+            </button>
 
-              <div className="p-2.5 rounded bg-stone-900 border border-stone-800">
-                <span className="text-[10px] text-stone-500 uppercase block">Positions Searched</span>
-                <span className="text-stone-200 font-bold">
-                  L:{bounds.positions.left.length} • M:{bounds.positions.middle.length} • R:{bounds.positions.right.length}
-                </span>
+            <button
+              onClick={() => onUpdateBounds({ strategy: 'HILL_CLIMBING' })}
+              className={`p-3 rounded-lg border text-left transition-colors cursor-pointer ${
+                activeStrategy === 'HILL_CLIMBING'
+                  ? 'bg-amber-950/60 border-amber-500 text-amber-300'
+                  : 'bg-stone-950/60 border-stone-800 text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <div className="flex items-center gap-2 font-mono text-xs font-bold mb-1">
+                <Flame className="w-4 h-4" />
+                Plugboard Hill Climbing
               </div>
+              <p className="text-[11px] text-stone-400 font-sans">
+                Stochastic random-restart optimization to discover unknown stecker cables.
+              </p>
+            </button>
 
-              <div className="p-2.5 rounded bg-stone-900 border border-stone-800">
-                <span className="text-[10px] text-stone-500 uppercase block">Scoring Metric</span>
-                <span className="text-amber-400 font-bold">{bounds.scoringMethod}</span>
+            <button
+              onClick={() => onUpdateBounds({ strategy: 'HYBRID' })}
+              className={`p-3 rounded-lg border text-left transition-colors cursor-pointer ${
+                activeStrategy === 'HYBRID'
+                  ? 'bg-amber-950/60 border-amber-500 text-amber-300'
+                  : 'bg-stone-950/60 border-stone-800 text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <div className="flex items-center gap-2 font-mono text-xs font-bold mb-1">
+                <Sparkles className="w-4 h-4" />
+                Hybrid Search
               </div>
+              <p className="text-[11px] text-stone-400 font-sans">
+                Compound sweep combining rotor position enumeration with plugboard hill climbing.
+              </p>
+            </button>
+          </div>
+        </div>
 
-              <div className="p-2.5 rounded bg-stone-900 border border-stone-800">
-                <span className="text-[10px] text-stone-500 uppercase block">Total Combinations</span>
-                <span className="text-amber-400 font-bold">{totalCombinations.toLocaleString()}</span>
-              </div>
+        {/* Workload Warning if Search Space is High */}
+        {costEstimate.isExcessive && (
+          <div className="flex items-start gap-2.5 p-3 rounded-lg bg-amber-950/50 border border-amber-600/50 text-amber-300 text-xs">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-400" />
+            <div>
+              <span className="font-bold">Heavy Computational Budget: </span>
+              {costEstimate.warningMessage}
             </div>
           </div>
         )}
 
-        {/* Advanced Mode Controls */}
-        {controlMode === 'advanced' && (
-          <div className="space-y-4 text-xs font-mono">
-            {/* Rotor Orders Checkboxes */}
-            <div className="space-y-2">
-              <label className="font-bold text-stone-300 uppercase tracking-wider block">
-                Permitted Rotor Wheel Orders ({bounds.rotorOrders.length} selected):
+        {/* Contextual Assistance Hint */}
+        {contextualAdvice && (
+          <div className="flex items-start gap-2.5 p-3 rounded-lg bg-stone-950 border border-stone-700/80 text-stone-300 text-xs font-sans">
+            <HelpCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-400" />
+            <div>
+              <span className="font-bold text-amber-400 font-mono">{contextualAdvice.title}: </span>
+              {contextualAdvice.message}{' '}
+              {contextualAdvice.actionRecommendation && (
+                <span className="text-stone-400 block mt-0.5 italic">{contextualAdvice.actionRecommendation}</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Strategy Specific Parameters */}
+        {activeStrategy === 'HILL_CLIMBING' || activeStrategy === 'HYBRID' ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-stone-800">
+            <div>
+              <label className="text-xs font-mono font-medium text-stone-300 block mb-1">
+                Random Restarts ({bounds.hillClimbing?.maxRestarts ?? 6})
               </label>
-              <div className="flex flex-wrap gap-2">
-                {ALL_ROTOR_PERMUTATIONS.map((perm) => {
-                  const key = perm.join('-');
+              <input
+                type="range"
+                min="1"
+                max="20"
+                value={bounds.hillClimbing?.maxRestarts ?? 6}
+                onChange={(e) =>
+                  onUpdateBounds({
+                    hillClimbing: {
+                      ...(bounds.hillClimbing || { maxIterationsPerRestart: 80, maxSteckerPairs: 6 }),
+                      maxRestarts: parseInt(e.target.value, 10),
+                    },
+                  })
+                }
+                className="w-full accent-amber-500 cursor-pointer"
+              />
+              <span className="text-[10px] text-stone-500 font-mono">Restarts help escape local optima</span>
+            </div>
+
+            <div>
+              <label className="text-xs font-mono font-medium text-stone-300 block mb-1">
+                Iterations per Restart ({bounds.hillClimbing?.maxIterationsPerRestart ?? 80})
+              </label>
+              <input
+                type="range"
+                min="20"
+                max="200"
+                step="10"
+                value={bounds.hillClimbing?.maxIterationsPerRestart ?? 80}
+                onChange={(e) =>
+                  onUpdateBounds({
+                    hillClimbing: {
+                      ...(bounds.hillClimbing || { maxRestarts: 6, maxSteckerPairs: 6 }),
+                      maxIterationsPerRestart: parseInt(e.target.value, 10),
+                    },
+                  })
+                }
+                className="w-full accent-amber-500 cursor-pointer"
+              />
+              <span className="text-[10px] text-stone-500 font-mono">Mutation step depth per climb</span>
+            </div>
+
+            <div>
+              <label className="text-xs font-mono font-medium text-stone-300 block mb-1">
+                Max Stecker Pairs ({bounds.hillClimbing?.maxSteckerPairs ?? 6})
+              </label>
+              <input
+                type="range"
+                min="2"
+                max="10"
+                value={bounds.hillClimbing?.maxSteckerPairs ?? 6}
+                onChange={(e) =>
+                  onUpdateBounds({
+                    hillClimbing: {
+                      ...(bounds.hillClimbing || { maxRestarts: 6, maxIterationsPerRestart: 80 }),
+                      maxSteckerPairs: parseInt(e.target.value, 10),
+                    },
+                  })
+                }
+                className="w-full accent-amber-500 cursor-pointer"
+              />
+              <span className="text-[10px] text-stone-500 font-mono">Permitted plugboard cable connections</span>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Advanced Rotor & Concurrency Controls */}
+        {controlMode === 'advanced' && (
+          <div className="space-y-4 pt-3 border-t border-stone-800">
+            {/* Multi-Worker Concurrency Selector */}
+            <div className="bg-stone-950 p-3 rounded-lg border border-stone-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-mono font-bold text-stone-200 block">
+                  Parallel Web Worker Concurrency
+                </span>
+                <span className="text-[11px] text-stone-400 font-sans">
+                  Partitions search spaces across background worker threads.
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {[1, 2, 4].map((workers) => (
+                  <button
+                    key={workers}
+                    onClick={() => onSetWorkerConcurrency(workers)}
+                    className={`px-3 py-1 rounded text-xs font-mono font-bold border cursor-pointer ${
+                      workerConcurrency === workers
+                        ? 'bg-amber-600 text-stone-950 border-amber-400'
+                        : 'bg-stone-900 border-stone-700 text-stone-400 hover:text-stone-200'
+                    }`}
+                  >
+                    {workers} {workers === 1 ? 'Worker' : 'Workers'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Scoring & Language Selection */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-mono font-medium text-stone-300 block mb-1">
+                  Fitness Scoring Metric
+                </label>
+                <select
+                  value={bounds.scoringMethod}
+                  onChange={(e) => onUpdateBounds({ scoringMethod: e.target.value as ScoringMethod })}
+                  className="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-1.5 text-xs font-mono text-stone-200 cursor-pointer"
+                >
+                  <option value="QUADGRAM">Quadgram Log-Likelihood (High Accuracy)</option>
+                  <option value="INDEX_OF_COINCIDENCE">Index of Coincidence (IoC)</option>
+                  <option value="CHI_SQUARE">Chi-Squared Goodness of Fit</option>
+                  <option value="CRIB_MATCH">Crib Matching Score</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-mono font-medium text-stone-300 block mb-1">
+                  Language Model
+                </label>
+                <select
+                  value={bounds.language ?? 'ENGLISH'}
+                  onChange={(e) => onUpdateBounds({ language: e.target.value as 'ENGLISH' | 'GERMAN' })}
+                  className="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-1.5 text-xs font-mono text-stone-200 cursor-pointer"
+                >
+                  <option value="ENGLISH">English Military Signals</option>
+                  <option value="GERMAN">German Wehrmacht / Kriegsmarine</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Permitted Rotor Orders */}
+            <div>
+              <label className="text-xs font-mono font-medium text-stone-300 block mb-1.5">
+                Permitted Rotor Orders ({bounds.rotorOrders.length} selected)
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {ALL_ROTOR_PERMUTATIONS.map((order) => {
+                  const key = order.join('-');
                   const isSelected = bounds.rotorOrders.some((o) => o.join('-') === key);
                   return (
                     <button
                       key={key}
-                      onClick={() => toggleRotorOrder(perm)}
-                      className={`px-3 py-1.5 rounded-lg border font-mono text-xs transition-colors cursor-pointer ${
+                      onClick={() => toggleRotorOrder(order)}
+                      className={`px-2.5 py-1 rounded text-xs font-mono border transition-colors cursor-pointer ${
                         isSelected
-                          ? 'bg-amber-950/80 border-amber-600/60 text-amber-300 font-bold'
-                          : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-200'
+                          ? 'bg-amber-950 border-amber-600 text-amber-300'
+                          : 'bg-stone-950 border-stone-800 text-stone-400 hover:border-stone-700'
                       }`}
                     >
                       {key}
@@ -203,180 +406,125 @@ export const AutomatedSearchPanel: React.FC<AutomatedSearchPanelProps> = ({
               </div>
             </div>
 
-            {/* Starting Positions Ranges */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Rotor Position Ranges */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {(['left', 'middle', 'right'] as const).map((wheel) => {
-                const count = bounds.positions[wheel].length;
+                const range = bounds.positions[wheel];
                 return (
                   <div key={wheel} className="bg-stone-950 p-3 rounded-lg border border-stone-800 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold uppercase text-stone-300">
-                        {wheel} Rotor ({count})
+                      <span className="text-xs font-mono font-bold text-amber-400 capitalize">
+                        {wheel} Rotor ({range.length} letters)
                       </span>
-                      <span className="text-[10px] text-amber-400">
-                        {count === 1 ? bounds.positions[wheel][0] : `${count} letters`}
-                      </span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handlePositionPreset(wheel, 'ALL')}
+                          className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-900 hover:bg-stone-800 text-stone-300"
+                        >
+                          A-Z
+                        </button>
+                        <button
+                          onClick={() => handlePositionPreset(wheel, 'A')}
+                          className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-900 hover:bg-stone-800 text-stone-300"
+                        >
+                          [A]
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handlePositionPreset(wheel, 'ALL')}
-                        className={`flex-1 py-1 rounded text-[10px] font-bold ${
-                          count === 26 ? 'bg-amber-900/60 text-amber-200' : 'bg-stone-900 text-stone-400'
-                        }`}
-                      >
-                        A-Z (26)
-                      </button>
-                      <button
-                        onClick={() => handlePositionPreset(wheel, 'FIRST_HALF')}
-                        className={`flex-1 py-1 rounded text-[10px] font-bold ${
-                          count === 13 ? 'bg-amber-900/60 text-amber-200' : 'bg-stone-900 text-stone-400'
-                        }`}
-                      >
-                        A-M (13)
-                      </button>
-                      <button
-                        onClick={() => handlePositionPreset(wheel, 'A')}
-                        className={`flex-1 py-1 rounded text-[10px] font-bold ${
-                          count === 1 ? 'bg-amber-900/60 text-amber-200' : 'bg-stone-900 text-stone-400'
-                        }`}
-                      >
-                        'A' Only
-                      </button>
+                    <div className="text-[11px] font-mono text-stone-400 truncate bg-stone-900/50 p-1.5 rounded border border-stone-800/80">
+                      {range.join(', ')}
                     </div>
                   </div>
                 );
               })}
             </div>
-
-            {/* Scoring Method Selector */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="bg-stone-950 p-3 rounded-lg border border-stone-800 space-y-1.5">
-                <label className="text-stone-300 font-bold block">Scoring Metric</label>
-                <select
-                  value={bounds.scoringMethod}
-                  onChange={(e) =>
-                    onUpdateBounds({ scoringMethod: e.target.value as ScoringMethod })
-                  }
-                  className="w-full bg-stone-900 border border-stone-700 rounded px-2.5 py-1.5 text-xs text-amber-400 font-mono focus:outline-none"
-                >
-                  <option value="CRIB_MATCH">Crib Matching (Word Alignment)</option>
-                  <option value="INDEX_OF_COINCIDENCE">Index of Coincidence (IoC)</option>
-                  <option value="CHI_SQUARE">Chi-Squared Distance ($\chi^2$)</option>
-                  <option value="QUADGRAM">Quadgram Log-Likelihood</option>
-                </select>
-              </div>
-
-              <div className="bg-stone-950 p-3 rounded-lg border border-stone-800 space-y-1.5">
-                <label className="text-stone-300 font-bold block">Candidate Limit</label>
-                <select
-                  value={bounds.maxCandidates ?? 25}
-                  onChange={(e) =>
-                    onUpdateBounds({ maxCandidates: parseInt(e.target.value, 10) })
-                  }
-                  className="w-full bg-stone-900 border border-stone-700 rounded px-2.5 py-1.5 text-xs text-amber-400 font-mono focus:outline-none"
-                >
-                  <option value={10}>Top 10 Candidates</option>
-                  <option value={25}>Top 25 Candidates</option>
-                  <option value={50}>Top 50 Candidates</option>
-                  <option value={100}>Top 100 Candidates</option>
-                </select>
-              </div>
-            </div>
           </div>
         )}
       </div>
 
-      {/* Live Search Dashboard */}
+      {/* Real-time Search Telemetry Dashboard */}
       {progress && (
         <div className="bg-stone-900 border border-stone-800 rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between border-b border-stone-800 pb-3">
             <div className="flex items-center gap-2">
-              <Gauge className="w-5 h-5 text-amber-400" />
-              <h4 className="text-xs font-mono font-bold text-stone-200 uppercase tracking-wider">
-                Live Search Execution Status
+              <Gauge className="w-4 h-4 text-amber-400" />
+              <h4 className="font-mono text-xs font-bold text-stone-200">
+                Search Telemetry & Performance
               </h4>
             </div>
-
             <span
-              className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-bold flex items-center gap-1 ${
-                progress.status === 'RUNNING'
-                  ? 'bg-amber-950 text-amber-300 border border-amber-600 animate-pulse'
-                  : progress.status === 'COMPLETED'
-                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-600'
-                    : progress.status === 'CANCELLED'
-                      ? 'bg-stone-800 text-stone-400'
-                      : 'bg-red-950 text-red-300'
+              className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded ${
+                progress.status === 'COMPLETED'
+                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-700'
+                  : progress.status === 'RUNNING'
+                    ? 'bg-amber-950 text-amber-400 border border-amber-600 animate-pulse'
+                    : 'bg-stone-800 text-stone-400'
               }`}
             >
               {progress.status}
             </span>
           </div>
 
-          {/* Progress Bar */}
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-xs font-mono text-stone-400">
-              <span>Progress: {progress.evaluatedCount.toLocaleString()} / {progress.totalCount.toLocaleString()}</span>
-              <span className="font-bold text-amber-400">{progress.percentComplete.toFixed(1)}%</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-stone-950 p-3 rounded-lg border border-stone-800">
+              <span className="text-[10px] font-mono text-stone-400 block uppercase">Evaluated</span>
+              <span className="text-base font-mono font-bold text-stone-100">
+                {progress.evaluatedCount.toLocaleString()}
+              </span>
+              <span className="text-[10px] text-stone-400 font-mono block">
+                / {progress.totalCount.toLocaleString()}
+              </span>
             </div>
-            <div className="w-full h-3 bg-stone-950 rounded-full overflow-hidden border border-stone-800">
+
+            <div className="bg-stone-950 p-3 rounded-lg border border-stone-800">
+              <span className="text-[10px] font-mono text-stone-400 block uppercase">Throughput</span>
+              <span className="text-base font-mono font-bold text-amber-400">
+                {progress.configsPerSecond.toLocaleString()}
+              </span>
+              <span className="text-[10px] text-stone-400 font-mono block">evals / sec</span>
+            </div>
+
+            <div className="bg-stone-950 p-3 rounded-lg border border-stone-800">
+              <span className="text-[10px] font-mono text-stone-400 block uppercase">Elapsed Time</span>
+              <span className="text-base font-mono font-bold text-stone-100">
+                {(progress.elapsedMs / 1000).toFixed(2)}s
+              </span>
+              <span className="text-[10px] text-stone-400 font-mono block">{progress.percentComplete.toFixed(1)}% complete</span>
+            </div>
+
+            <div className="bg-stone-950 p-3 rounded-lg border border-stone-800">
+              <span className="text-[10px] font-mono text-stone-400 block uppercase">Best Score</span>
+              <span className="text-base font-mono font-bold text-emerald-400">
+                {progress.currentBestScore === -Infinity ? '—' : progress.currentBestScore.toFixed(3)}
+              </span>
+              <span className="text-[10px] text-stone-400 font-mono block truncate">
+                {progress.currentBestCandidate?.config.rotors.map((r) => r.position).join('') || '—'}
+              </span>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="space-y-1">
+            <div className="w-full bg-stone-950 rounded-full h-2 overflow-hidden border border-stone-800">
               <div
-                style={{ width: `${Math.min(100, progress.percentComplete)}%` }}
-                className="h-full bg-amber-500 rounded-full transition-all duration-200"
+                className="bg-amber-500 h-full transition-all duration-150"
+                style={{ width: `${progress.percentComplete}%` }}
               />
             </div>
           </div>
 
-          {/* Real-time Telemetry Metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-stone-950 p-3 rounded-lg border border-stone-800">
-              <div className="text-[10px] font-mono text-stone-500 uppercase">Elapsed Time</div>
-              <div className="text-base font-mono font-bold text-stone-200 mt-0.5">
-                {(progress.elapsedMs / 1000).toFixed(2)}s
-              </div>
-            </div>
-
-            <div className="bg-stone-950 p-3 rounded-lg border border-stone-800">
-              <div className="text-[10px] font-mono text-stone-500 uppercase">Search Speed</div>
-              <div className="text-base font-mono font-bold text-amber-400 mt-0.5">
-                {progress.configsPerSecond.toLocaleString()} <span className="text-[10px] text-stone-500">keys/sec</span>
-              </div>
-            </div>
-
-            <div className="bg-stone-950 p-3 rounded-lg border border-stone-800">
-              <div className="text-[10px] font-mono text-stone-500 uppercase">Best Score</div>
-              <div className="text-base font-mono font-bold text-emerald-400 mt-0.5">
-                {progress.currentBestScore === -Infinity ? 'N/A' : progress.currentBestScore.toFixed(3)}
-              </div>
-            </div>
-
-            <div className="bg-stone-950 p-3 rounded-lg border border-stone-800">
-              <div className="text-[10px] font-mono text-stone-500 uppercase">Current Best</div>
-              <div className="text-xs font-mono font-bold text-stone-200 mt-1 truncate">
-                {progress.currentBestCandidate
-                  ? `${progress.currentBestCandidate.config.rotors.map((r) => r.type).join('-')} [${progress.currentBestCandidate.config.rotors.map((r) => r.position).join('')}]`
-                  : 'Searching...'}
-              </div>
-            </div>
-          </div>
-
-          {/* Real-time Best Score Graph */}
+          {/* Convergence Chart SVG */}
           {svgScorePath && (
-            <div className="bg-stone-950 p-3 rounded-lg border border-stone-800 space-y-2">
-              <div className="flex items-center justify-between text-[10px] font-mono text-stone-400 uppercase">
-                <span>Score Convergence Over Search Evaluations</span>
-                <span className="text-emerald-400 font-bold">Max: {progress.currentBestScore.toFixed(3)}</span>
+            <div className="pt-2 border-t border-stone-800/80">
+              <div className="flex items-center justify-between mb-1 text-[11px] font-mono text-stone-400">
+                <span>Score Convergence Over Evaluations</span>
+                <span className="text-emerald-400 font-bold">
+                  Peak: {progress.currentBestScore.toFixed(3)}
+                </span>
               </div>
-              <div className="h-16 w-full flex items-center justify-center">
-                <svg viewBox="0 0 300 60" className="w-full h-full overflow-visible">
-                  <path
-                    d={svgScorePath}
-                    fill="none"
-                    stroke="#f59e0b"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
+              <div className="bg-stone-950 p-2 rounded-lg border border-stone-800 flex justify-center">
+                <svg viewBox="0 0 320 65" className="w-full h-16 stroke-amber-400 fill-none stroke-2">
+                  <path d={svgScorePath} />
                 </svg>
               </div>
             </div>

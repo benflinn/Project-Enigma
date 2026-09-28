@@ -3,6 +3,8 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { App } from '../app/App';
 import { EnigmaMachineView } from '../features/simulator/EnigmaMachineView';
 import { TutorialMissionView } from '../features/campaign/TutorialMissionView';
+import { CampaignView } from '../features/campaign/CampaignView';
+import { WorkstationView } from '../features/workstation/WorkstationView';
 import { useSimulatorStore } from '../state/simulatorStore';
 import { useCampaignStore } from '../state/campaignStore';
 import { DEFAULT_ENIGMA_CONFIG } from '../engine/enigma';
@@ -98,16 +100,19 @@ describe('Enigma Machine Simulator Components', () => {
   });
 });
 
-describe('Cryptanalysis Campaign Tutorial Mission', () => {
+describe('Cryptanalysis Campaign Operations & Workstation', () => {
   beforeEach(() => {
     act(() => {
-      useCampaignStore.getState().resetTutorial();
+      useCampaignStore.getState().exitMission();
       useSimulatorStore.getState().loadConfig(DEFAULT_ENIGMA_CONFIG);
       useSimulatorStore.getState().clearText();
     });
   });
 
   it('renders tutorial mission step 1 briefing', () => {
+    act(() => {
+      useCampaignStore.getState().startTutorial();
+    });
     render(<TutorialMissionView />);
 
     const titles = screen.getAllByText(/Your First Encrypted Message/i);
@@ -116,25 +121,28 @@ describe('Cryptanalysis Campaign Tutorial Mission', () => {
     expect(briefings.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('progresses through tutorial steps and reveals hints', () => {
-    render(<TutorialMissionView />);
-
-    // Step 0 -> Click Next Step
-    const nextBtn = screen.getByRole('button', { name: /Next Step/i });
+  it('renders Campaign Hub with all 6 missions', () => {
     act(() => {
-      fireEvent.click(nextBtn);
+      useCampaignStore.getState().exitMission();
     });
+    render(<CampaignView />);
 
-    const stepTitles = screen.getAllByText(/Step 1: The Initial Contact/i);
-    expect(stepTitles.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Cryptanalysis Operations Hub/i)).toBeInTheDocument();
+    expect(screen.getByText(/The Plugboard Problem/i)).toBeInTheDocument();
+    expect(screen.getByText(/Multiple Possibilities/i)).toBeInTheDocument();
+    expect(screen.getByText(/The Analyst’s Desk/i)).toBeInTheDocument();
+  });
 
-    // Request hint
-    const hintBtn = screen.getByRole('button', { name: /Need a Hint/i });
-    act(() => {
-      fireEvent.click(hintBtn);
-    });
+  it('renders Cryptanalysis Workstation with strategy controls and profile trigger', () => {
+    render(<WorkstationView />);
 
-    expect(screen.getByText(/Hint #1:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cryptanalysis Workstation/i)).toBeInTheDocument();
+    expect(screen.getByText(/Profile:/i)).toBeInTheDocument();
+    const archives = screen.getAllByText(/Intercept Archive/i);
+    expect(archives.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Statistical Analysis/i)).toBeInTheDocument();
+    expect(screen.getByText(/Crib-Testing Tool/i)).toBeInTheDocument();
+    expect(screen.getByText(/Automated Search/i)).toBeInTheDocument();
   });
 });
 

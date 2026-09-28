@@ -8,11 +8,18 @@ describe('Campaign Operations & Mastery Challenges', () => {
     await storage.resetAllData();
   });
 
-  it('contains 3 complete training operations', () => {
-    expect(ALL_MISSIONS.length).toBe(3);
+  it('contains 6 complete training operations', () => {
+    expect(ALL_MISSIONS.length).toBe(6);
     expect(ALL_MISSIONS[0].id).toBe('mission-1-first-message');
     expect(ALL_MISSIONS[1].id).toBe('mission-2-finding-a-clue');
     expect(ALL_MISSIONS[2].id).toBe('mission-3-automated-breakthrough');
+    expect(ALL_MISSIONS[3].id).toBe('mission-4-plugboard-problem');
+    expect(ALL_MISSIONS[4].id).toBe('mission-5-multiple-possibilities');
+    expect(ALL_MISSIONS[5].id).toBe('mission-6-analysts-desk');
+  });
+
+  it('contains 6 comprehensive mastery challenges', () => {
+    expect(MASTERY_CHALLENGES.length).toBe(6);
   });
 
   it('advances through Mission 2 and handles crib clash deductions', () => {

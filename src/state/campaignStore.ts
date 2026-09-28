@@ -4,6 +4,7 @@ import {
   ALL_MISSIONS,
   MISSION_1,
 } from '../features/campaign/campaignMissions';
+import { useWorkstationStore } from './workstationStore';
 
 export interface CampaignState {
   activeMissionId: string;
@@ -142,8 +143,19 @@ export const useCampaignStore = create<CampaignState>((set, get) => ({
       set({ completedMissions: updatedCompletedMissions, completed: true });
       await storage.saveUnlockedFeatures({
         completedMissions: updatedCompletedMissions,
-        advancedWorkstationControls: updatedCompletedMissions.includes('mission-3-automated-breakthrough'),
+        advancedWorkstationControls:
+          updatedCompletedMissions.includes('mission-3-automated-breakthrough') ||
+          updatedCompletedMissions.includes('mission-4-plugboard-problem') ||
+          updatedCompletedMissions.includes('mission-5-multiple-possibilities') ||
+          updatedCompletedMissions.includes('mission-6-analysts-desk'),
+        hillClimbingUnlocked: updatedCompletedMissions.includes('mission-4-plugboard-problem'),
+        hybridSearchUnlocked: updatedCompletedMissions.includes('mission-5-multiple-possibilities'),
       });
+      useWorkstationStore.getState().recordProficiencyEvent(
+        'searchStrategy',
+        'SUCCESS',
+        `Completed Campaign Mission: ${currentMission.title}`
+      );
     }
 
     const record: CampaignProgressRecord = {
@@ -211,6 +223,11 @@ export const useCampaignStore = create<CampaignState>((set, get) => ({
         revealedHints: [...revealedHints, nextHintIndex],
         hintsUsedCount: hintsUsedCount + 1,
       });
+      useWorkstationStore.getState().recordProficiencyEvent(
+        'enigmaMechanics',
+        'HINT_USED',
+        `Requested hint for ${currentMission.title}`
+      );
       get().saveProgress();
     }
   },
@@ -230,7 +247,18 @@ export const useCampaignStore = create<CampaignState>((set, get) => ({
     });
 
     if (isCorrect) {
+      useWorkstationStore.getState().recordProficiencyEvent(
+        'statisticalInterpretation',
+        'SUCCESS',
+        `Answered deduction correctly in ${currentMission.title}`
+      );
       get().saveProgress();
+    } else {
+      useWorkstationStore.getState().recordProficiencyEvent(
+        'statisticalInterpretation',
+        'FAILURE',
+        `Incorrect deduction in ${currentMission.title}`
+      );
     }
 
     return isCorrect;
@@ -268,6 +296,11 @@ export const useCampaignStore = create<CampaignState>((set, get) => ({
         completedMasteryChallenges: updated,
         advancedWorkstationControls: true, // mastery unlocks advanced tools
       });
+      await useWorkstationStore.getState().recordProficiencyEvent(
+        'searchStrategy',
+        'SUCCESS',
+        `Completed Mastery Challenge: ${challengeId}`
+      );
     }
   },
 

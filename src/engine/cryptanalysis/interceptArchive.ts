@@ -126,6 +126,45 @@ const CONFIG_FOXTROT: EnigmaMachineConfig = {
 const PLAINTEXT_FOXTROT = 'WOLFPACKCONVERGEATGRIDFOURTYNINEREFUELINGATDUSK';
 const CIPHERTEXT_FOXTROT = generateCiphertext(PLAINTEXT_FOXTROT, CONFIG_FOXTROT);
 
+// 7. Mission 4 / Advanced: Submarine Command Wolfpack (Plugboard optimization focus: Rotors II-IV-V, pos E-N-I, Stecker: AV, BS, DL, FU)
+const CONFIG_GOLF: EnigmaMachineConfig = {
+  rotors: [
+    { type: 'II', position: 'E', ringSetting: 1 },
+    { type: 'IV', position: 'N', ringSetting: 1 },
+    { type: 'V', position: 'I', ringSetting: 1 },
+  ],
+  reflector: 'B',
+  plugboard: ['AV', 'BS', 'DL', 'FU'],
+};
+const PLAINTEXT_GOLF = 'SUBMARINESCONVERGEATGRIDTWELVETORPEDOLOADEDANDREADY';
+const CIPHERTEXT_GOLF = generateCiphertext(PLAINTEXT_GOLF, CONFIG_GOLF);
+
+// 8. Mission 5 / Advanced: Bismarck Escort Squadron (Hybrid search focus: Rotors I-III-V, pos B-M-?, Stecker: CG, HZ, IN)
+const CONFIG_HOTEL: EnigmaMachineConfig = {
+  rotors: [
+    { type: 'I', position: 'B', ringSetting: 1 },
+    { type: 'III', position: 'M', ringSetting: 1 },
+    { type: 'V', position: 'K', ringSetting: 1 },
+  ],
+  reflector: 'B',
+  plugboard: ['CG', 'HZ', 'IN'],
+};
+const PLAINTEXT_HOTEL = 'BATTLESHIPSETCOURSEFORBRESTREFUELINGATPOINTVICTOR';
+const CIPHERTEXT_HOTEL = generateCiphertext(PLAINTEXT_HOTEL, CONFIG_HOTEL);
+
+// 9. Mission 6 / Master: Reichsmarine High-Command Dispatch (Open-ended Analyst Desk: Rotors III-I-II, pos F-I-X, Stecker: KM, OW, RX)
+const CONFIG_INDIA: EnigmaMachineConfig = {
+  rotors: [
+    { type: 'III', position: 'F', ringSetting: 1 },
+    { type: 'I', position: 'I', ringSetting: 1 },
+    { type: 'II', position: 'X', ringSetting: 1 },
+  ],
+  reflector: 'B',
+  plugboard: ['KM', 'OW', 'RX'],
+};
+const PLAINTEXT_INDIA = 'SPECIALDISPATCHSECRETOPERATIONKREUZOTTERCOMMENCINGNOW';
+const CIPHERTEXT_INDIA = generateCiphertext(PLAINTEXT_INDIA, CONFIG_INDIA);
+
 export const TRAINING_MESSAGES: InterceptTrainingMessage[] = [
   {
     id: 'intercept-101-alpha',
@@ -302,6 +341,96 @@ export const TRAINING_MESSAGES: InterceptTrainingMessage[] = [
       ],
     },
     compatibleTechniques: ['ROTOR_ORDER_SEARCH', 'START_POSITION_SEARCH', 'CHI_SQUARE_FITNESS'],
+  },
+  {
+    id: 'intercept-401-golf',
+    title: 'Submarine Command Wolfpack (Grid 12)',
+    historicalContext:
+      'Intercepted operational command for Atlantic wolfpack deployment. Rotors II-IV-V and starting positions E-N-I are recovered from a captured weather trawler log, but multiple Stecker connections remain unknown. Intelligence notes reference mysterious transmission routing code "ORION-7".',
+    difficulty: 'advanced',
+    ciphertext: CIPHERTEXT_GOLF,
+    plaintext: PLAINTEXT_GOLF,
+    secretConfig: CONFIG_GOLF,
+    playerKnowns: {
+      rotorOrderKnown: true,
+      knownRotorOrder: ['II', 'IV', 'V'],
+      ringSettingsKnown: true,
+      knownRingSettings: [1, 1, 1],
+      reflectorKnown: true,
+      knownReflector: 'B',
+      plugboardKnown: false,
+      knownPlugboard: ['AV'], // Player knows AV from clue; BS, DL, FU to be discovered via Hill Climbing
+      knownPositions: ['E', 'N', 'I'],
+      suspectedCribs: [
+        {
+          text: 'SUBMARINES',
+          description: 'U-Boat fleet identifier',
+          suggestedOffset: 0,
+        },
+      ],
+    },
+    compatibleTechniques: ['CHI_SQUARE_FITNESS', 'CRIB_ANALYSIS'],
+    missionEligibility: ['mission-4'],
+  },
+  {
+    id: 'intercept-402-hotel',
+    title: 'Battleship Escort Squadron Victor',
+    historicalContext:
+      'High-priority tactical movement order for capital ships breaking out into the Atlantic. Wheel order is locked to Rotors I-III-V at ring settings 1-1-1. Rotor positions B-M-? have one unknown wheel, and plugboard steckers must be optimized.',
+    difficulty: 'advanced',
+    ciphertext: CIPHERTEXT_HOTEL,
+    plaintext: PLAINTEXT_HOTEL,
+    secretConfig: CONFIG_HOTEL,
+    playerKnowns: {
+      rotorOrderKnown: true,
+      knownRotorOrder: ['I', 'III', 'V'],
+      ringSettingsKnown: true,
+      knownRingSettings: [1, 1, 1],
+      reflectorKnown: true,
+      knownReflector: 'B',
+      plugboardKnown: false,
+      knownPlugboard: ['CG'], // Player knows CG; HZ, IN to be discovered via Hybrid search
+      knownPositions: ['B', 'M', null],
+      suspectedCribs: [
+        {
+          text: 'BATTLESHIP',
+          description: 'Naval vessel class',
+          suggestedOffset: 0,
+        },
+      ],
+    },
+    compatibleTechniques: ['START_POSITION_SEARCH', 'CRIB_ANALYSIS', 'CHI_SQUARE_FITNESS'],
+    missionEligibility: ['mission-5'],
+  },
+  {
+    id: 'intercept-403-india',
+    title: 'Reichsmarine Dispatch (Operation Kreuzotter)',
+    historicalContext:
+      'Top-secret strategic directive intercepted by Government Code and Cypher School (Bletchley Park). Multiple investigative routes exist: crib dragging against known naval operational codenames, statistical language analysis, or multi-stage hybrid search.',
+    difficulty: 'advanced',
+    ciphertext: CIPHERTEXT_INDIA,
+    plaintext: PLAINTEXT_INDIA,
+    secretConfig: CONFIG_INDIA,
+    playerKnowns: {
+      rotorOrderKnown: true,
+      knownRotorOrder: ['III', 'I', 'II'],
+      ringSettingsKnown: true,
+      knownRingSettings: [1, 1, 1],
+      reflectorKnown: true,
+      knownReflector: 'B',
+      plugboardKnown: false,
+      knownPlugboard: ['KM'],
+      knownPositions: ['F', 'I', 'X'],
+      suspectedCribs: [
+        {
+          text: 'SPECIALDISPATCH',
+          description: 'Standard administrative header',
+          suggestedOffset: 0,
+        },
+      ],
+    },
+    compatibleTechniques: ['CRIB_ANALYSIS', 'START_POSITION_SEARCH', 'CHI_SQUARE_FITNESS', 'INDEX_OF_COINCIDENCE'],
+    missionEligibility: ['mission-6'],
   },
 ];
 

@@ -1,5 +1,7 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { EnigmaMachineConfig } from '../engine/enigma';
+import { PlayerProficiencyRecord, DEFAULT_PROFICIENCY } from '../engine/cryptanalysis/adaptiveIntelligence';
+import { SearchBounds } from '../engine/cryptanalysis/searchEngine';
 
 export interface CampaignProgressRecord {
   missionId: string;
@@ -28,6 +30,7 @@ export interface AppSettingsRecord {
   autoGroupFiveLetters: boolean;
   showSignalExplanation: boolean;
   keyboardLayout: 'QWERTZ' | 'QWERTY';
+  workerConcurrency?: number;
 }
 
 export interface NotebookEntryRecord {
@@ -40,6 +43,15 @@ export interface NotebookEntryRecord {
   decryptedPlaintext?: string;
   createdAt: string;
   updatedAt: string;
+  tags?: string[];
+}
+
+export interface SavedSearchRecord {
+  id: string;
+  title: string;
+  ciphertext: string;
+  bounds: SearchBounds;
+  createdAt: string;
 }
 
 export interface UnlockedFeaturesRecord {
@@ -48,6 +60,8 @@ export interface UnlockedFeaturesRecord {
   cribAnalysisUnlocked: boolean;
   automatedSearchUnlocked: boolean;
   statisticalToolsUnlocked: boolean;
+  hillClimbingUnlocked: boolean;
+  hybridSearchUnlocked: boolean;
   completedMissions: string[];
   completedMasteryChallenges: string[];
 }
@@ -82,10 +96,18 @@ export interface EnigmaDBSchema extends DBSchema {
     key: string;
     value: UnlockedFeaturesRecord;
   };
+  adaptive_profile: {
+    key: string;
+    value: PlayerProficiencyRecord;
+  };
+  saved_searches: {
+    key: string;
+    value: SavedSearchRecord;
+  };
 }
 
 const DB_NAME = 'project_enigma_db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 class StorageManager {
   private dbPromise: Promise<IDBPDatabase<EnigmaDBSchema>> | null = null;
@@ -115,6 +137,12 @@ class StorageManager {
           if (!db.objectStoreNames.contains('unlocked_features')) {
             db.createObjectStore('unlocked_features', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('adaptive_profile')) {
+            db.createObjectStore('adaptive_profile', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('saved_searches')) {
+            db.createObjectStore('saved_searches', { keyPath: 'id' });
+          }
         },
       });
     }
@@ -131,6 +159,7 @@ class StorageManager {
       autoGroupFiveLetters: true,
       showSignalExplanation: true,
       keyboardLayout: 'QWERTZ',
+      workerConcurrency: 2,
     };
 
     try {
@@ -182,6 +211,70 @@ class StorageManager {
       await db.clear('campaign_progress');
     } catch (e) {
       console.error('Failed to reset campaign progress:', e);
+    }
+  }
+
+  // --- Adaptive Proficiency Profile ---
+  public async getProficiency(): Promise<PlayerProficiencyRecord> {
+    try {
+      const db = await this.getDB();
+      if (!db) return DEFAULT_PROFICIENCY;
+      const stored = await db.get('adaptive_profile', 'player_profile');
+      return stored ? { ...DEFAULT_PROFICIENCY, ...stored } : DEFAULT_PROFICIENCY;
+    } catch {
+      return DEFAULT_PROFICIENCY;
+    }
+  }
+
+  public async saveProficiency(profile: PlayerProficiencyRecord): Promise<void> {
+    try {
+      const db = await this.getDB();
+      if (!db) return;
+      await db.put('adaptive_profile', { ...profile, id: 'player_profile' });
+    } catch (e) {
+      console.error('Failed to save proficiency:', e);
+    }
+  }
+
+  public async resetProficiency(): Promise<void> {
+    try {
+      const db = await this.getDB();
+      if (!db) return;
+      await db.put('adaptive_profile', DEFAULT_PROFICIENCY);
+    } catch (e) {
+      console.error('Failed to reset proficiency:', e);
+    }
+  }
+
+  // --- Saved Search Presets ---
+  public async getSavedSearches(): Promise<SavedSearchRecord[]> {
+    try {
+      const db = await this.getDB();
+      if (!db) return [];
+      const records = await db.getAll('saved_searches');
+      return records.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch {
+      return [];
+    }
+  }
+
+  public async saveSearchRecord(record: SavedSearchRecord): Promise<void> {
+    try {
+      const db = await this.getDB();
+      if (!db) return;
+      await db.put('saved_searches', record);
+    } catch (e) {
+      console.error('Failed to save search record:', e);
+    }
+  }
+
+  public async deleteSavedSearch(id: string): Promise<void> {
+    try {
+      const db = await this.getDB();
+      if (!db) return;
+      await db.delete('saved_searches', id);
+    } catch (e) {
+      console.error('Failed to delete saved search:', e);
     }
   }
 
@@ -310,6 +403,8 @@ class StorageManager {
       cribAnalysisUnlocked: true,
       automatedSearchUnlocked: true,
       statisticalToolsUnlocked: true,
+      hillClimbingUnlocked: false,
+      hybridSearchUnlocked: false,
       completedMissions: [],
       completedMasteryChallenges: [],
     };
@@ -346,6 +441,8 @@ class StorageManager {
       await db.clear('simulator_state');
       await db.clear('notebook_entries');
       await db.clear('unlocked_features');
+      await db.clear('adaptive_profile');
+      await db.clear('saved_searches');
     } catch (e) {
       console.error('Failed to reset all data:', e);
     }

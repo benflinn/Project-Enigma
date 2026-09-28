@@ -7,6 +7,8 @@ import {
   BookmarkPlus,
   Check,
   Search,
+  ArrowRightLeft,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface ResultsPanelProps {
@@ -19,6 +21,7 @@ interface ResultsPanelProps {
     notes: string,
     candidate: CandidateResult
   ) => void;
+  onCompareCandidates?: (candidateA: CandidateResult, candidateB: CandidateResult) => void;
 }
 
 export const ResultsPanel: React.FC<ResultsPanelProps> = ({
@@ -27,6 +30,7 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({
   onSelectCandidate,
   onTransferToSimulator,
   onSaveToNotebook,
+  onCompareCandidates,
 }) => {
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -94,6 +98,20 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({
                       <CheckCircle2 className="w-3 h-3" /> Exact Crib Match
                     </span>
                   )}
+                  {selectedCandidate.confidence && (
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border flex items-center gap-1 ${
+                        selectedCandidate.confidence.rating === 'Definitive'
+                          ? 'bg-emerald-950 text-emerald-300 border-emerald-600'
+                          : selectedCandidate.confidence.rating === 'High'
+                            ? 'bg-amber-950 text-amber-300 border-amber-600'
+                            : 'bg-stone-800 text-stone-300 border-stone-700'
+                      }`}
+                    >
+                      <ShieldCheck className="w-3 h-3" />
+                      {selectedCandidate.confidence.rating} Confidence
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs font-mono text-stone-400">
                   Statistical Score: <strong className="text-amber-400 font-bold">{selectedCandidate.score.toFixed(3)}</strong>
@@ -101,7 +119,20 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {candidates.length >= 2 && onCompareCandidates && (
+                <button
+                  onClick={() => {
+                    const runnerUp = candidates.find((c) => c.rank !== selectedCandidate.rank) || candidates[1];
+                    onCompareCandidates(selectedCandidate, runnerUp);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-300 text-xs font-mono border border-stone-700 transition-colors cursor-pointer"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                  <span>Compare Candidates</span>
+                </button>
+              )}
+
               <button
                 onClick={() => handleTransfer(selectedCandidate)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
@@ -158,8 +189,8 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({
 
             <div className="p-2.5 rounded bg-stone-950 border border-stone-800">
               <span className="text-[10px] text-stone-500 uppercase block">Reflector / Stecker</span>
-              <span className="text-stone-300 font-bold">
-                {selectedCandidate.config.reflector} ({selectedCandidate.config.plugboard.length} pairs)
+              <span className="text-stone-300 font-bold truncate block">
+                {selectedCandidate.config.reflector} ({selectedCandidate.config.plugboard.length > 0 ? selectedCandidate.config.plugboard.join(' ') : 'None'})
               </span>
             </div>
           </div>
@@ -197,6 +228,7 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({
                 <th className="py-2.5 px-3">Rank</th>
                 <th className="py-2.5 px-3">Rotors</th>
                 <th className="py-2.5 px-3">Positions</th>
+                <th className="py-2.5 px-3">Plugboard</th>
                 <th className="py-2.5 px-3">Score</th>
                 <th className="py-2.5 px-4">Recovered Plaintext Sample</th>
                 <th className="py-2.5 px-3 text-right">Action</th>
@@ -221,6 +253,9 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({
                     </td>
                     <td className="py-2.5 px-3 text-amber-400 font-bold tracking-widest">
                       {cand.config.rotors.map((r) => r.position).join('')}
+                    </td>
+                    <td className="py-2.5 px-3 text-stone-300 truncate max-w-[100px]">
+                      {cand.config.plugboard.length > 0 ? cand.config.plugboard.join(' ') : '—'}
                     </td>
                     <td className="py-2.5 px-3 text-emerald-400">
                       {cand.score.toFixed(3)}

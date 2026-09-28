@@ -60,7 +60,7 @@ export const App: React.FC = () => {
                 PROJECT ENIGMA
               </span>
               <span className="text-[10px] text-stone-400 font-mono block -mt-1">
-                Historical Simulator & Workstation v0.2
+                Historical Simulator & Workstation v0.3
               </span>
             </div>
           </button>
@@ -114,7 +114,7 @@ export const App: React.FC = () => {
               <Cpu className="w-3.5 h-3.5" />
               Workstation
               <span className="text-[9px] bg-stone-800 text-amber-400/90 px-1 rounded border border-stone-700">
-                v0.2
+                v0.3
               </span>
             </button>
 

@@ -296,17 +296,27 @@ export const CampaignView: React.FC = () => {
           </div>
         )}
 
-        {currentMission.id === 'mission-3-automated-breakthrough' && (
+        {['mission-3-automated-breakthrough', 'mission-4-plugboard-problem', 'mission-5-multiple-possibilities', 'mission-6-analysts-desk'].includes(currentMission.id) && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-xs font-mono uppercase text-stone-400 px-1">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Automated Bounded Solver (Station Alpha Intercept)</span>
+              <span>
+                {currentMission.id === 'mission-4-plugboard-problem'
+                  ? 'Plugboard Optimization Solver (Wolfpack Intercept)'
+                  : currentMission.id === 'mission-5-multiple-possibilities'
+                    ? 'Hybrid Cryptanalysis Workspace (Battleship Intercept)'
+                    : currentMission.id === 'mission-6-analysts-desk'
+                      ? 'Analyst Desk Multi-Path Workbench (Kreuzotter Dispatch)'
+                      : 'Automated Bounded Solver (Station Alpha Intercept)'}
+              </span>
             </div>
             <AutomatedSearchPanel
               bounds={workstation.searchBounds}
               isSearching={workstation.isSearching}
               progress={workstation.searchProgress}
-              controlMode="basic"
+              controlMode="advanced"
+              workerConcurrency={workstation.workerConcurrency}
+              onSetWorkerConcurrency={workstation.setWorkerConcurrency}
               onUpdateBounds={workstation.updateSearchBounds}
               onStartSearch={workstation.startSearch}
               onCancelSearch={workstation.cancelSearch}
@@ -434,6 +444,16 @@ export const CampaignView: React.FC = () => {
                     onClick={() => {
                       selectMission(mission.id);
                       startMission(mission.id);
+                      if (mission.interceptId) {
+                        workstation.selectMessage(mission.interceptId);
+                        if (mission.id === 'mission-4-plugboard-problem') {
+                          workstation.updateSearchBounds({ strategy: 'HILL_CLIMBING' });
+                        } else if (mission.id === 'mission-5-multiple-possibilities') {
+                          workstation.updateSearchBounds({ strategy: 'HYBRID' });
+                        } else if (mission.id === 'mission-3-automated-breakthrough') {
+                          workstation.updateSearchBounds({ strategy: 'EXHAUSTIVE' });
+                        }
+                      }
                     }}
                     className={`w-full py-2.5 rounded-xl font-mono text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                       isCompleted
