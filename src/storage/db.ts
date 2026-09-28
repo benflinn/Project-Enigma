@@ -30,6 +30,28 @@ export interface AppSettingsRecord {
   keyboardLayout: 'QWERTZ' | 'QWERTY';
 }
 
+export interface NotebookEntryRecord {
+  id: string;
+  messageId: string;
+  title: string;
+  notes: string;
+  config: EnigmaMachineConfig;
+  candidateScore?: number;
+  decryptedPlaintext?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UnlockedFeaturesRecord {
+  id: 'unlocks';
+  advancedWorkstationControls: boolean;
+  cribAnalysisUnlocked: boolean;
+  automatedSearchUnlocked: boolean;
+  statisticalToolsUnlocked: boolean;
+  completedMissions: string[];
+  completedMasteryChallenges: string[];
+}
+
 export interface EnigmaDBSchema extends DBSchema {
   settings: {
     key: string;
@@ -52,10 +74,18 @@ export interface EnigmaDBSchema extends DBSchema {
       outputText: string;
     };
   };
+  notebook_entries: {
+    key: string;
+    value: NotebookEntryRecord;
+  };
+  unlocked_features: {
+    key: string;
+    value: UnlockedFeaturesRecord;
+  };
 }
 
 const DB_NAME = 'project_enigma_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 class StorageManager {
   private dbPromise: Promise<IDBPDatabase<EnigmaDBSchema>> | null = null;
@@ -78,6 +108,12 @@ class StorageManager {
           }
           if (!db.objectStoreNames.contains('simulator_state')) {
             db.createObjectStore('simulator_state', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('notebook_entries')) {
+            db.createObjectStore('notebook_entries', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('unlocked_features')) {
+            db.createObjectStore('unlocked_features', { keyPath: 'id' });
           }
         },
       });
@@ -234,6 +270,71 @@ class StorageManager {
     ];
   }
 
+  // --- Investigation Notebook ---
+  public async getNotebookEntries(): Promise<NotebookEntryRecord[]> {
+    try {
+      const db = await this.getDB();
+      if (!db) return [];
+      const entries = await db.getAll('notebook_entries');
+      return entries.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    } catch {
+      return [];
+    }
+  }
+
+  public async saveNotebookEntry(entry: NotebookEntryRecord): Promise<void> {
+    try {
+      const db = await this.getDB();
+      if (!db) return;
+      await db.put('notebook_entries', entry);
+    } catch (e) {
+      console.error('Failed to save notebook entry:', e);
+    }
+  }
+
+  public async deleteNotebookEntry(id: string): Promise<void> {
+    try {
+      const db = await this.getDB();
+      if (!db) return;
+      await db.delete('notebook_entries', id);
+    } catch (e) {
+      console.error('Failed to delete notebook entry:', e);
+    }
+  }
+
+  // --- Unlocked Features ---
+  public async getUnlockedFeatures(): Promise<UnlockedFeaturesRecord> {
+    const defaultUnlocks: UnlockedFeaturesRecord = {
+      id: 'unlocks',
+      advancedWorkstationControls: false,
+      cribAnalysisUnlocked: true,
+      automatedSearchUnlocked: true,
+      statisticalToolsUnlocked: true,
+      completedMissions: [],
+      completedMasteryChallenges: [],
+    };
+
+    try {
+      const db = await this.getDB();
+      if (!db) return defaultUnlocks;
+      const stored = await db.get('unlocked_features', 'unlocks');
+      return stored ? { ...defaultUnlocks, ...stored } : defaultUnlocks;
+    } catch {
+      return defaultUnlocks;
+    }
+  }
+
+  public async saveUnlockedFeatures(unlocks: Partial<UnlockedFeaturesRecord>): Promise<void> {
+    try {
+      const db = await this.getDB();
+      if (!db) return;
+      const current = await this.getUnlockedFeatures();
+      await db.put('unlocked_features', { ...current, ...unlocks, id: 'unlocks' });
+    } catch (e) {
+      console.error('Failed to save unlocked features:', e);
+    }
+  }
+
   // --- Reset All Data ---
   public async resetAllData(): Promise<void> {
     try {
@@ -243,6 +344,8 @@ class StorageManager {
       await db.clear('campaign_progress');
       await db.clear('machine_presets');
       await db.clear('simulator_state');
+      await db.clear('notebook_entries');
+      await db.clear('unlocked_features');
     } catch (e) {
       console.error('Failed to reset all data:', e);
     }

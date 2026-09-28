@@ -1,106 +1,264 @@
-import React from 'react';
-import { Cpu, Lock, Terminal, Wrench, ShieldAlert, Clock } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { useWorkstationStore } from '../../state/workstationStore';
+import { getTrainingMessageById } from '../../engine/cryptanalysis/interceptArchive';
+import { InterceptArchivePanel } from './InterceptArchivePanel';
+import { MessageInspector } from './MessageInspector';
+import { StatisticalAnalysisPanel } from './StatisticalAnalysisPanel';
+import { CribTestingPanel } from './CribTestingPanel';
+import { AutomatedSearchPanel } from './AutomatedSearchPanel';
+import { ResultsPanel } from './ResultsPanel';
+import { InvestigationNotebookPanel } from './InvestigationNotebookPanel';
+import {
+  Radio,
+  BarChart3,
+  Search,
+  Cpu,
+  Award,
+  BookOpen,
+  Sliders,
+  Sparkles,
+} from 'lucide-react';
 
 export const WorkstationView: React.FC = () => {
+  const {
+    selectedMessageId,
+    controlMode,
+    activeTab,
+    cribInput,
+    searchBounds,
+    searchProgress,
+    candidateResults,
+    selectedCandidate,
+    notebookEntries,
+    isSearching,
+    selectMessage,
+    setControlMode,
+    setActiveTab,
+    setCribInput,
+    setSelectedCribOffset,
+    updateSearchBounds,
+    startSearch,
+    cancelSearch,
+    selectCandidate,
+    saveToNotebook,
+    deleteNotebookEntry,
+    loadNotebook,
+    loadUnlocks,
+    transferCandidateToSimulator,
+    transferConfigToSimulator,
+  } = useWorkstationStore();
+
+  useEffect(() => {
+    loadNotebook();
+    loadUnlocks();
+  }, [loadNotebook, loadUnlocks]);
+
+  const currentMessage = getTrainingMessageById(selectedMessageId);
+
+  const handleSendCribToSearch = (crib: string, offset: number) => {
+    setCribInput(crib);
+    setSelectedCribOffset(offset);
+    updateSearchBounds({
+      scoringMethod: 'CRIB_MATCH',
+      crib: { text: crib, offset },
+    });
+    setActiveTab('search');
+  };
+
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-12">
-      {/* Header Banner */}
-      <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 sm:p-8 shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-600/50 text-amber-400 text-xs font-mono mb-3">
-              <Clock className="w-3.5 h-3.5" />
-              Upcoming Feature • Version 0.2 Roadmap
-            </div>
-            <h1 className="font-cinzel text-2xl sm:text-3xl font-bold text-stone-100">
-              Cryptanalysis Workstation
-            </h1>
-            <p className="text-stone-400 font-mono text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">
-              An advanced automated laboratory for breaking intercepted Enigma traffic using historical and modern cryptanalytic methods.
-            </p>
+    <div className="max-w-7xl mx-auto space-y-6 pb-16">
+      {/* Workstation Research Laboratory Header */}
+      <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-600/50 text-amber-400 text-xs font-mono mb-2">
+            <Sparkles className="w-3.5 h-3.5" />
+            Bletchley Park Research Laboratory • Version 0.2
           </div>
+          <h1 className="font-cinzel text-2xl sm:text-3xl font-bold text-stone-100">
+            Cryptanalysis Workstation
+          </h1>
+          <p className="text-stone-400 font-mono text-xs sm:text-sm mt-1 max-w-2xl">
+            Autonomous multi-threaded cryptanalytic laboratory for analyzing intercepts, dragging cribs, and executing bounded keyspace searches.
+          </p>
+        </div>
 
-          <div className="shrink-0 p-4 rounded-xl bg-stone-950 border border-stone-800 flex flex-col items-center justify-center text-center">
-            <Cpu className="w-8 h-8 text-amber-500 mb-1 animate-pulse" />
-            <span className="text-[10px] font-mono uppercase tracking-widest text-stone-400">Status</span>
-            <span className="text-xs font-mono font-bold text-amber-400">In Design (v0.2)</span>
-          </div>
+        {/* Basic vs Advanced Control Mode Switcher */}
+        <div className="flex items-center gap-2 bg-stone-950 p-1.5 rounded-xl border border-stone-800 self-start md:self-auto">
+          <button
+            onClick={() => setControlMode('basic')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all cursor-pointer ${
+              controlMode === 'basic'
+                ? 'bg-amber-950/90 text-amber-300 border border-amber-600/50 shadow'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Basic Mode</span>
+          </button>
+
+          <button
+            onClick={() => setControlMode('advanced')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all cursor-pointer ${
+              controlMode === 'advanced'
+                ? 'bg-amber-950/90 text-amber-300 border border-amber-600/50 shadow'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>Advanced Mode</span>
+          </button>
         </div>
       </div>
 
-      {/* Honest Upcoming Notice */}
-      <div className="bg-amber-950/20 border border-amber-800/40 rounded-xl p-5 flex items-start gap-3">
-        <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-        <div className="space-y-1 text-xs font-mono text-amber-200">
-          <strong className="text-amber-300 block font-bold">Historical Integrity Notice:</strong>
-          <p>
-            In accordance with the Version 0.1 specification, automated breaking engines and hill-climbing solvers are not active in this release. All features below represent the active architectural contracts being built for Milestone 0.2.
-          </p>
-        </div>
+      {/* Primary Navigation Tabs */}
+      <div className="flex items-center gap-1 overflow-x-auto pb-2 border-b border-stone-800">
+        <button
+          onClick={() => setActiveTab('archive')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs font-bold transition-colors shrink-0 cursor-pointer ${
+            activeTab === 'archive'
+              ? 'bg-stone-900 text-amber-400 border border-amber-600/40 shadow'
+              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900/50'
+          }`}
+        >
+          <Radio className="w-4 h-4" />
+          <span>Intercept Archive</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('statistics')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs font-bold transition-colors shrink-0 cursor-pointer ${
+            activeTab === 'statistics'
+              ? 'bg-stone-900 text-amber-400 border border-amber-600/40 shadow'
+              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900/50'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>Statistical Analysis</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('crib')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs font-bold transition-colors shrink-0 cursor-pointer ${
+            activeTab === 'crib'
+              ? 'bg-stone-900 text-amber-400 border border-amber-600/40 shadow'
+              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900/50'
+          }`}
+        >
+          <Search className="w-4 h-4" />
+          <span>Crib-Testing Tool</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('search')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs font-bold transition-colors shrink-0 cursor-pointer ${
+            activeTab === 'search'
+              ? 'bg-stone-900 text-amber-400 border border-amber-600/40 shadow'
+              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900/50'
+          }`}
+        >
+          <Cpu className={`w-4 h-4 ${isSearching ? 'text-amber-400 animate-spin' : ''}`} />
+          <span>Automated Search</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('results')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs font-bold transition-colors shrink-0 cursor-pointer ${
+            activeTab === 'results'
+              ? 'bg-stone-900 text-amber-400 border border-amber-600/40 shadow'
+              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900/50'
+          }`}
+        >
+          <Award className="w-4 h-4" />
+          <span>Candidate Results {candidateResults.length > 0 && `(${candidateResults.length})`}</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('notebook')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs font-bold transition-colors shrink-0 cursor-pointer ${
+            activeTab === 'notebook'
+              ? 'bg-stone-900 text-amber-400 border border-amber-600/40 shadow'
+              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900/50'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>Notebook {notebookEntries.length > 0 && `(${notebookEntries.length})`}</span>
+        </button>
       </div>
 
-      {/* Planned Feature Modules Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-stone-900/80 border border-stone-800 rounded-xl p-5 space-y-3">
-          <div className="flex items-center gap-2 text-amber-400">
-            <Terminal className="w-5 h-5" />
-            <h3 className="font-cinzel font-bold text-base text-stone-100">
-              Turing-Welchman Bombe Simulator
-            </h3>
-          </div>
-          <p className="text-xs text-stone-400 font-mono leading-relaxed">
-            Simulates the electromechanical Bombe developed at Bletchley Park to test "menus" derived from cribs (known plaintext guesses) across 17,576 rotor alignments simultaneously.
-          </p>
-          <div className="text-[11px] font-mono text-stone-500 pt-2 border-t border-stone-800">
-            Target: Diagonal board crib validation & stop detection
-          </div>
-        </div>
+      {/* Active Selected Message Inspector (shown above analysis tools) */}
+      {currentMessage && activeTab !== 'archive' && (
+        <MessageInspector
+          message={currentMessage}
+          onSendCribToSearch={handleSendCribToSearch}
+          onNavigateToTab={(tab) => setActiveTab(tab)}
+        />
+      )}
 
-        <div className="bg-stone-900/80 border border-stone-800 rounded-xl p-5 space-y-3">
-          <div className="flex items-center gap-2 text-amber-400">
-            <Wrench className="w-5 h-5" />
-            <h3 className="font-cinzel font-bold text-base text-stone-100">
-              Polish Cyclometer & Zygalski Perforated Sheets
-            </h3>
-          </div>
-          <p className="text-xs text-stone-400 font-mono leading-relaxed">
-            Recreates Marian Rejewski's card-catalog cycle method and Zygalski sheets for determining rotor order and female indicator positions from early 1930s transmissions.
-          </p>
-          <div className="text-[11px] font-mono text-stone-500 pt-2 border-t border-stone-800">
-            Target: Indicator exploitation & permutation cycle theory
-          </div>
-        </div>
+      {/* Active Tab View Rendering */}
+      {activeTab === 'archive' && (
+        <InterceptArchivePanel
+          selectedMessageId={selectedMessageId}
+          onSelectMessage={(id) => {
+            selectMessage(id);
+            setActiveTab('search');
+          }}
+        />
+      )}
 
-        <div className="bg-stone-900/80 border border-stone-800 rounded-xl p-5 space-y-3">
-          <div className="flex items-center gap-2 text-amber-400">
-            <Cpu className="w-5 h-5" />
-            <h3 className="font-cinzel font-bold text-base text-stone-100">
-              Multi-Threaded Web Worker Solvers
-            </h3>
-          </div>
-          <p className="text-xs text-stone-400 font-mono leading-relaxed">
-            Offloads computationally intensive ciphertext-only attacks (Index of Coincidence, Bigram/Trigram scoring, and Hill-Climbing plugboard optimization) to background Web Workers without freezing the UI.
-          </p>
-          <div className="text-[11px] font-mono text-stone-500 pt-2 border-t border-stone-800">
-            Target: Fast parallel IC calculation & sinkhorn optimization
-          </div>
-        </div>
+      {activeTab === 'statistics' && currentMessage && (
+        <StatisticalAnalysisPanel
+          ciphertext={currentMessage.ciphertext}
+          samplePlaintext={selectedCandidate?.plaintext}
+        />
+      )}
 
-        <div className="bg-stone-900/80 border border-stone-800 rounded-xl p-5 space-y-3">
-          <div className="flex items-center gap-2 text-amber-400">
-            <Lock className="w-5 h-5" />
-            <h3 className="font-cinzel font-bold text-base text-stone-100">
-              Bletchley Park Banburismus Analysis
-            </h3>
-          </div>
-          <p className="text-xs text-stone-400 font-mono leading-relaxed">
-            Alan Turing's probability scoring method utilizing overlapping message depths on Banbury sheets to eliminate unlikely right rotor combinations before running the Bombes.
-          </p>
-          <div className="text-[11px] font-mono text-stone-500 pt-2 border-t border-stone-800">
-            Target: Deciban scoring & letter-frequency cross-matching
-          </div>
-        </div>
-      </div>
+      {activeTab === 'crib' && currentMessage && (
+        <CribTestingPanel
+          ciphertext={currentMessage.ciphertext}
+          initialCrib={cribInput || 'WEATHER'}
+          onSelectOffset={(offset, crib) => {
+            setSelectedCribOffset(offset);
+            setCribInput(crib);
+          }}
+          onSendToSearch={handleSendCribToSearch}
+        />
+      )}
+
+      {activeTab === 'search' && (
+        <AutomatedSearchPanel
+          bounds={searchBounds}
+          isSearching={isSearching}
+          progress={searchProgress}
+          controlMode={controlMode}
+          onUpdateBounds={updateSearchBounds}
+          onStartSearch={startSearch}
+          onCancelSearch={cancelSearch}
+        />
+      )}
+
+      {activeTab === 'results' && (
+        <ResultsPanel
+          candidates={candidateResults}
+          selectedCandidate={selectedCandidate}
+          onSelectCandidate={selectCandidate}
+          onTransferToSimulator={transferCandidateToSimulator}
+          onSaveToNotebook={(title, notes, cand) => {
+            saveToNotebook(title, notes, cand.config, cand.score, cand.plaintext);
+          }}
+        />
+      )}
+
+      {activeTab === 'notebook' && (
+        <InvestigationNotebookPanel
+          entries={notebookEntries}
+          onDeleteEntry={deleteNotebookEntry}
+          onTransferToSimulator={transferConfigToSimulator}
+          onAddNewEntry={(title, notes, config, score, plaintext) => {
+            saveToNotebook(title, notes, config, score, plaintext);
+          }}
+          currentConfig={selectedCandidate?.config}
+        />
+      )}
     </div>
   );
 };

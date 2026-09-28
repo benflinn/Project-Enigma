@@ -60,7 +60,7 @@ export const App: React.FC = () => {
                 PROJECT ENIGMA
               </span>
               <span className="text-[10px] text-stone-400 font-mono block -mt-1">
-                Historical Simulator v0.1
+                Historical Simulator & Workstation v0.2
               </span>
             </div>
           </button>

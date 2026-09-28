@@ -1,151 +1,116 @@
-# PROJECT ENIGMA (Version 0.1)
+# PROJECT ENIGMA — Version 0.2
+### Authentic Wehrmacht Enigma Simulator & Cryptanalysis Research Workstation
 
-An authentic browser-based historical Enigma machine simulator and story-driven cryptanalysis training environment.
-
----
-
-## 1. Overview & Project Vision
-
-Project ENIGMA is designed around two independent modes:
-
-1. **Authentic Enigma Simulator (Mode 1)**: An uncompromising, mathematically precise simulation of the historical German military Enigma I (Wehrmacht / Luftwaffe 3-rotor machine). Operators can configure rotor types (I–V), ring settings (Ringstellung), starting positions (Grundstellung), reflectors (UKW A, B, C), and plugboard connections (Steckerbrett).
-2. **Cryptanalysis Campaign (Mode 2)**: A narrative pedagogical experience. Version 0.1 includes the complete opening mission: **"Your First Encrypted Message"**, introducing rotor advancement, polyalphabetic substitution, and reciprocal decryption through guided discovery and progressive assistance.
+PROJECT ENIGMA is an authentic, browser-based historical German military Enigma I (Wehrmacht/Luftwaffe) machine simulator, story-driven cryptanalysis training campaign, and multi-threaded cryptanalytic research laboratory built with React 19, TypeScript, Vite, Tailwind CSS, Zustand, and IndexedDB.
 
 ---
 
-## 2. Technology Stack
+## 🏛️ Project Overview & Architecture
 
-- **Core Framework**: React 19, TypeScript (Strict Mode)
-- **Bundler & Build Tool**: Vite 6
-- **Styling**: Tailwind CSS v4, Lucide Icons, Custom Enigma Mechanical Aesthetics
+Project ENIGMA is structured into two complementary modes:
+
+1. **Mode 1: Authentic Enigma Simulator (Independent Engine & Physical Interface)**
+   - Complete historical Wehrmacht Enigma I emulation with 5 interchangeable rotors (I, II, III, IV, V), turnover notches, middle rotor double-stepping anomaly (*Anomalie des Fortschaltmechanismus*), 3 reflectors (A, B, C), configurable Ringstellung (ring settings 1–26), and Steckerbrett (plugboard twin-socket cross-wiring).
+   - Electrical signal tracing viewer computing live 13-stage circuit paths through the machine.
+   - Symmetrical reciprocal encryption/decryption ($E_K(E_K(P)) = P$).
+
+2. **Mode 2: The Cryptanalysis Workstation & Training Campaign (Version 0.2)**
+   - **Signals Intercept Archive**: 6 reproducible training intercepts spanning beginner, intermediate, and advanced cryptanalytic difficulty.
+   - **Statistical Analysis Engine**: Index of Coincidence (IoC), Chi-Squared ($\chi^2$) goodness-of-fit distance, and Quadgram log-likelihood scoring with interactive monogram frequency distribution visualizers.
+   - **Crib-Testing Tool**: Drag suspected plaintext fragments ("cribs") across ciphertext to eliminate impossible alignments using Enigma's fundamental mathematical property that *no character can ever encrypt to itself* ($C_i \neq P_i$).
+   - **Multi-Threaded Automated Search Engine**: Dedicated background Web Worker executing bounded keyspace searches across rotor permutations, custom starting position windows, and scoring models without blocking UI rendering (60 FPS).
+   - **Investigation Notebook**: Persistent hypothesis logging, candidate configuration comparison, and one-click transfer to the physical simulator.
+   - **Storyline Training Campaign (3 Full Operations)**:
+     - *Operation 1: Your First Encrypted Message* (Rotor advancement & polyalphabetic mechanics).
+     - *Operation 2: Finding a Clue* (Crib dragging & self-encryption elimination).
+     - *Operation 3: Your First Automated Breakthrough* (Bounded keyspace breaking & physical simulator verification).
+   - **Optional Mastery Challenges**: Practical assessments unlocking Advanced Workstation features early.
+
+---
+
+## 💻 Tech Stack & Engineering Standards
+
+- **Core Framework**: React 19, TypeScript 5.7 (Strict type-checking)
+- **Bundler & Worker Pipeline**: Vite 6.2 with dedicated Web Worker compilation
+- **Styling**: Tailwind CSS v4 with bespoke historical brass & Bletchley Park dark research aesthetic
 - **State Management**: Zustand v5
-- **Persistence**: IndexedDB (via `idb` with schema versioning)
-- **Unit & Cryptographic Testing**: Vitest, React Testing Library, jsdom
-- **Browser & E2E Testing**: Playwright
+- **Local Persistence**: IndexedDB (Schema v2 with automated migration and store isolation)
+- **Testing**: Vitest 3.0 & React Testing Library
 
 ---
 
-## 3. Software Architecture
+## 🔬 Cryptanalysis Engine Details
 
-The application is structured into decoupled, modular layers:
+### 1. Index of Coincidence (IoC)
+Calculates the probability that two randomly selected characters from a text are identical:
+$$\text{IC} = \frac{\sum_{i=\text{A}}^{\text{Z}} f_i(f_i - 1)}{N(N - 1)}$$
+- Natural English Plaintext: $\approx 0.0667$
+- Natural German Plaintext: $\approx 0.0762$
+- Uniform Polyalphabetic Enigma Noise: $\approx 0.0385$
 
-```text
-src/
-├── app/                  # Application shell, navigation bar, modal dialogs
-├── components/           # Reusable UI primitives (Buttons, Cards, Badges)
-├── features/
-│   ├── home/             # Project landing page & quick launch hub
-│   ├── simulator/        # Physical machine view: Rotors, Lampboard, Keyboard, Plugboard, Tape
-│   ├── campaign/         # Story campaign: TutorialMissionView, hint tiering, deduction engine
-│   ├── workstation/      # Cryptanalysis Workstation roadmap (planned v0.2 automated solvers)
-│   └── about/            # Historical context, Bletchley Park/Polish Cipher Bureau history
-├── engine/
-│   ├── enigma/           # Pure TypeScript cryptographic engine (independent of React/Zustand)
-│   │   ├── rotor.ts          # Rotor forward/reverse transformations & turnover notch detection
-│   │   ├── reflector.ts      # Symmetric involution reflectors (UKW A, B, C)
-│   │   ├── plugboard.ts      # Steckerbrett pairwise letter swapping & validation
-│   │   ├── enigmaMachine.ts  # Master machine: stepping, double-stepping, full 13-stage signal trace
-│   │   ├── inputNormalizer.ts# Military 5-character grouping & text sanitization
-│   │   └── constants.ts      # Historically authentic rotor & reflector wirings
-│   └── cryptanalysis/    # Interfaces and Web Worker contracts for future algorithmic solvers
-├── state/                # Zustand global stores (simulatorStore, campaignStore, settingsStore)
-├── storage/              # IndexedDB adapter with schema versioning & reset mechanisms
-├── styles/               # CSS custom properties, chassis textures, illuminated lamp glows
-└── tests/                # Cryptographic test vectors, unit tests, and component test suites
-```
+### 2. Crib-Dragging Non-Self-Encryption Elimination
+Because electrical current in an Enigma machine loops through the paired contacts of the Reflector (Umkehrwalze), a character can never encrypt to itself:
+$$\forall i, \quad E(P_i) \neq P_i$$
+When placing a crib of length $L$ at offset $k$, if $\exists j \in [0, L-1]$ such that $C_{k+j} = \text{Crib}_j$, the alignment is discarded as mathematically impossible.
+
+### 3. Web Worker Bounded Keyspace Solver
+- Runs in a background thread via `src/engine/cryptanalysis/searchWorker.ts` and `searchClient.ts`.
+- Evaluates candidate rotor orders, ring settings, and starting positions against candidate ciphertexts.
+- Ranks candidate results deterministically using fitness functions (IoC, Chi-squared, Quadgram log-likelihood, and exact crib matching).
+- Supports instant cancellation and session isolation against stale responses.
 
 ---
 
-## 4. Cryptographic Implementation Details
-
-### Historical Rotor Wirings (Enigma I / M3)
-- **Rotor I**: `EKMFLGDQVZNTOWYHXUSPAIBRCJ`, Turnover Notch: **Q** (steps adjacent rotor on $Q \to R$)
-- **Rotor II**: `AJDKSIRUXBLHWTMCQGZNPYFVOE`, Turnover Notch: **E** (steps adjacent rotor on $E \to F$)
-- **Rotor III**: `BDFHJLCPRTXVZNYEIWGAKMUSQO`, Turnover Notch: **V** (steps adjacent rotor on $V \to W$)
-- **Rotor IV**: `ESOVPZJAYQUIRHXLNFTGKDCMWB`, Turnover Notch: **J** (steps adjacent rotor on $J \to K$)
-- **Rotor V**: `VZBRGITYUPSDNHLXAWMJQOFECK`, Turnover Notch: **Z** (steps adjacent rotor on $Z \to A$)
-
-### Reflectors (Umkehrwalze)
-- **Reflector A**: `EJMZALYXVBWFCRQUONTSPIKHGD`
-- **Reflector B**: `YRUHQSLDPXNGOKMIEBFZCWVJAT` (Standard 1939 Wehrmacht)
-- **Reflector C**: `FVPJIAOYEDRZXWGCTKUQSBNMHL`
-
-### Double-Stepping Anomaly
-Stepping occurs **before** electrical signal transmission. On every keypress:
-1. The right rotor always advances.
-2. If the middle rotor is at its turnover notch, on the subsequent keystroke its ratchet pawl advances **both** the middle rotor again and the left rotor.
-3. If the right rotor was at its turnover notch, the middle rotor advances.
-
-### Signal Path Trace
-The engine computes and exposes the exact 13-stage electrical journey for every letter:
-$$\text{Key} \to \text{Plugboard (In)} \to \text{ETW} \to R_3 \to R_2 \to R_1 \to \text{UKW} \to R_1^{-1} \to R_2^{-1} \to R_3^{-1} \to \text{ETW} \to \text{Plugboard (Out)} \to \text{Lamp}$$
-
----
-
-## 5. Installation & Development
+## 🚀 Getting Started
 
 ### Prerequisites
-- **Node.js**: v18+ LTS (Tested on Node.js v24.14.0)
-- **npm**: v10+
+- Node.js LTS (v20+ recommended)
+- npm
 
-### Installation
+### Installation & Development
 ```bash
 # Clone or navigate to the repository
 cd enigma
 
-# Install all dependencies
+# Install dependencies
 npm install
-```
 
-### Running the Development Server
-```bash
+# Start local development server
 npm run dev
-```
-Open [http://localhost:5173](http://localhost:5173) in your web browser.
 
-### Running Automated Cryptographic & Component Tests
-```bash
-# Run all Vitest unit, cryptographic, and component tests
+# Run unit and integration tests
 npm test
 
-# Run tests in watch mode
-npm run test:watch
-```
-
-### TypeScript Type Checking & Production Build
-```bash
-# Verify TypeScript strict compliance
+# Run TypeScript strict typecheck
 npm run typecheck
 
-# Create optimized production build
+# Build for production
 npm run build
 ```
 
 ---
 
-## 6. Verification & Test Vectors
+## 🧪 Automated Test Suite
 
-Historical accuracy is verified by automated test suites:
-- **Test Vector 1**: Rotors I-II-III, Reflector B, Ring settings `AAA` (1,1,1), Starting position `AAA`, No plugboard:
-  - Input: `AAAAA` $\longrightarrow$ Output: `BDZGO`
-- **Test Vector 2 (Military Intercept with Plugs)**: Rotors II-IV-V, Reflector B, Ring settings `02 21 12` (`BUL`), Start `BLA`, 10 Stecker pairs (`AV BS CG DL FU HZ IN KM OW RX`):
-  - Encryption and reciprocal decryption symmetry verified identically.
-- **Double-Stepping Verification**: Tested on Rotors I-II-III starting at `A-D-U` advancing sequentially through `A-D-V` $\to$ `A-E-W` $\to$ `B-F-X` (verifying middle rotor double advance and left rotor turnover).
-- **Involutory Non-Self-Encryption Verification**: Validated across the alphabet that $E(x) \neq x$.
+Run the full test suite with:
+```bash
+npm test
+```
+The test suite validates:
+- Authentic Wehrmacht Enigma I wiring & rotor stepping test vectors (e.g., `AAAAA` $\to$ `BDZGO`).
+- Middle rotor double-stepping anomaly mechanics.
+- Involutory encryption/decryption symmetry.
+- Statistical calculations (IoC, Chi-squared, Quadgrams).
+- Crib clash detection and impossible alignment elimination.
+- Bounded search deterministic candidate discovery on intercepted naval messages.
+- Search cancellation and progress telemetry.
+- IndexedDB Schema v2 migrations and investigation notebook persistence.
+- Campaign mission progression, deduction prompts, and mastery challenge unlocks.
 
 ---
 
-## 7. Known Limitations & Milestone 0.2 Roadmap
-
-### Version 0.1 Scope (Delivered)
-- Full 3-rotor Wehrmacht Enigma I simulation with Rotors I–V, Reflector B, Steckerbrett.
-- QWERTZ physical and virtual keyboard integration.
-- Electrical circuit signal path explanation viewer.
-- Mission 1 Tutorial with persistent IndexedDB progress.
-- Machine configuration preset manager.
-
-### Planned for Milestone 0.2 (Upcoming)
-- **Turing-Welchman Bombe Simulator**: Automated crib-drag menu solver.
-- **Polish Cyclometer & Zygalski Sheets**: Permutation cycle indicators.
-- **Parallel Web Worker Cryptanalysis**: Multi-threaded Index of Coincidence and Hill-Climbing plugboard solver.
-- **Missions 2 through 7**: Advanced fictional cryptanalysis campaign missions.
+## 🗺️ Roadmap: Version 0.3
+- Integration of Turing-Welchman Bombe menu electrical diagonal board simulation.
+- Polish Zygalski perforated sheet visualizer.
+- Plugboard hill-climbing optimization heuristics.
+- German language reference quadgram libraries.
